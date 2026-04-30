@@ -10,6 +10,8 @@ export default () => ({
     url: process.env.REDIS_URL || 'redis://localhost:6379',
   },
 
+  pinataJwt: process.env.PINATA_JWT || '',
+
   blockchain: {
     sepoliaRpc: process.env.SEPOLIA_RPC_URL || '',
     sepoliaWs: process.env.SEPOLIA_WS_URL || '',

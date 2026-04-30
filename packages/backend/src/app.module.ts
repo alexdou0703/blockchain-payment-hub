@@ -11,6 +11,7 @@ import { DisputesModule } from './disputes/disputes.module';
 import { OracleModule } from './oracle/oracle.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { SettlementModule } from './settlement/settlement.module';
+import { FiatModule } from './fiat/fiat.module';
 
 @Module({
   imports: [
@@ -62,6 +63,7 @@ import { SettlementModule } from './settlement/settlement.module';
     OracleModule,
     NotificationsModule,
     SettlementModule,
+    FiatModule,
   ],
 })
 export class AppModule {}
