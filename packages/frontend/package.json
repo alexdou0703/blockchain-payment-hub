@@ -1,0 +1,39 @@
+{
+  "name": "@payment-hub/frontend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start -p 3000",
+    "lint": "next lint",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "next": "14.2.5",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "wagmi": "^2.12.7",
+    "viem": "^2.21.19",
+    "@rainbow-me/rainbowkit": "^2.2.0",
+    "@tanstack/react-query": "^5.56.2",
+    "socket.io-client": "^4.7.5",
+    "zustand": "^4.5.5",
+    "@radix-ui/react-dialog": "^1.1.1",
+    "@radix-ui/react-toast": "^1.2.1",
+    "@radix-ui/react-progress": "^1.1.0",
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^2.5.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4",
+    "@types/node": "^22.5.5",
+    "@types/react": "^18.3.5",
+    "@types/react-dom": "^18.3.0",
+    "tailwindcss": "^3.4.10",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.45",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "14.2.5"
+  }
+}
