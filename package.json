@@ -1,0 +1,19 @@
+{
+  "name": "payment-hub",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "pnpm@8.15.0",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "contracts:test": "pnpm --filter contracts test",
+    "contracts:deploy": "pnpm --filter contracts deploy:sepolia",
+    "backend:dev": "pnpm --filter backend start:dev",
+    "frontend:dev": "pnpm --filter frontend dev",
+    "oracle:dev": "pnpm --filter oracle start:dev"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0"
+  }
+}

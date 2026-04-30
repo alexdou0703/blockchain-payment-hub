@@ -1,0 +1,25 @@
+# Dependencies
+**/node_modules/
+
+# Build output
+**/dist/
+**/*.tsbuildinfo
+
+# Test coverage
+**/coverage/
+
+# Hardhat generated (regenerate with: pnpm --filter contracts compile)
+**/artifacts/
+**/cache/
+**/typechain-types/
+
+# Environment secrets — keep .env.example, ignore real .env
+**/.env
+!**/.env.example
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
