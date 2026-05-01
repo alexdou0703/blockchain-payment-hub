@@ -7,7 +7,7 @@ import '@rainbow-me/rainbowkit/styles.css';
 
 const config = getDefaultConfig({
   appName: 'Blockchain Payment Hub',
-  projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_ID ?? 'demo',
+  projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ?? 'demo',
   chains: [sepolia],
   ssr: true,
 });

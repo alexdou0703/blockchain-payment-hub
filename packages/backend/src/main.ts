@@ -16,8 +16,13 @@ async function bootstrap() {
     }),
   );
 
-  // CORS — allow all origins for development; tighten in production
-  app.enableCors();
+  // CORS — explicit config required for preflight (OPTIONS) requests
+  app.enableCors({
+    origin: ['http://localhost:3000', 'http://localhost:3001'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
+  });
 
   // Swagger API documentation at /api/docs
   const config = new DocumentBuilder()
