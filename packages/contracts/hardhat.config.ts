@@ -3,8 +3,11 @@ import "@nomicfoundation/hardhat-toolbox";
 import "hardhat-gas-reporter";
 import "solidity-coverage";
 import * as dotenv from "dotenv";
+import * as path from "path";
 
-dotenv.config();
+// Load .env from repo root (two levels up from packages/contracts)
+dotenv.config({ path: path.resolve(__dirname, "../../.env") });
+dotenv.config(); // fallback: also load packages/contracts/.env if present
 
 const config: HardhatUserConfig = {
   solidity: {
