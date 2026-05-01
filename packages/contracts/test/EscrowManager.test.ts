@@ -1,3 +1,4 @@
+import "@nomicfoundation/hardhat-chai-matchers";
 import { ethers } from "hardhat";
 import { expect } from "chai";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
