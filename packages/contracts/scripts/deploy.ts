@@ -11,18 +11,47 @@ import * as path from "path";
 // - MockERC20 now has a mint() call so test accounts have tokens.
 // - Saves all addresses to shared/constants/addresses.json for backend use.
 
+// On live networks (Sepolia) only signers[0] (DEPLOYER_PRIVATE_KEY) is available.
+// For those networks we derive deterministic test wallets from the deployer's key
+// and use their *addresses only* — they hold no ETH and cannot sign, but are
+// sufficient as constructor arguments (arbiters, providers, etc.).
+function deriveTestAddress(deployer: { address: string }, index: number): string {
+    const hash = ethers.keccak256(
+        ethers.solidityPacked(["address", "uint256"], [deployer.address, index])
+    );
+    // Take the last 20 bytes of the 32-byte hash → standard address derivation
+    return ethers.getAddress("0x" + hash.slice(-40));
+}
+
 async function main() {
     const signers = await ethers.getSigners();
     const deployer   = signers[0];
-    const treasury   = signers[1];
-    const provider1  = signers[2];  // mock GHN
-    const provider2  = signers[3];  // mock GHTK
-    const provider3  = signers[4];  // mock Viettel Post
-    const arbiter1   = signers[5];
-    const arbiter2   = signers[6];
-    const arbiter3   = signers[7];
-    const customer   = signers[8];
-    const merchant   = signers[9];
+    const isLocalnet = signers.length > 1;
+
+    const addr = (idx: number): string =>
+        isLocalnet ? signers[idx].address : deriveTestAddress(deployer, idx);
+
+    // treasury re-uses deployer on testnet so fee withdrawals are accessible
+    const treasuryAddr  = isLocalnet ? signers[1].address  : deployer.address;
+    const provider1Addr = addr(2);
+    const provider2Addr = addr(3);
+    const provider3Addr = addr(4);
+    const arbiter1Addr  = addr(5);
+    const arbiter2Addr  = addr(6);
+    const arbiter3Addr  = addr(7);
+    const customerAddr  = isLocalnet ? signers[8].address  : deployer.address;
+    const merchantAddr  = isLocalnet ? signers[9].address  : deployer.address;
+
+    // Shim objects with .address for uniform usage below
+    const treasury  = { address: treasuryAddr  };
+    const provider1 = { address: provider1Addr };
+    const provider2 = { address: provider2Addr };
+    const provider3 = { address: provider3Addr };
+    const arbiter1  = { address: arbiter1Addr  };
+    const arbiter2  = { address: arbiter2Addr  };
+    const arbiter3  = { address: arbiter3Addr  };
+    const customer  = { address: customerAddr  };
+    const merchant  = { address: merchantAddr  };
 
     console.log("Deploying with:", deployer.address);
     console.log("Network:", (await ethers.provider.getNetwork()).name);
