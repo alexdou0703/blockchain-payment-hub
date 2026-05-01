@@ -39,83 +39,85 @@ export enum DisputeState {
 
 /** Mirrors the Solidity PaymentPayload struct */
 export interface PaymentPayload {
-  merchant: string;   // address
-  customer: string;   // address
-  amount: string;     // uint256 as decimal string
-  orderId: string;    // bytes32 hex
-  nonce: string;      // bytes32 hex
-  deadline: number;   // unix timestamp
-  token: string;      // ERC-20 address
+  merchant: string;
+  customer: string;
+  amount: string;
+  orderId: string;
+  nonce: string;
+  deadline: number;
+  token: string;
 }
 
 // ---------------------------------------------------------------------------
-// ABI Arrays — match compiled artifacts exactly
+// ABI Arrays — JSON format required by Wagmi v2 / viem
 // ---------------------------------------------------------------------------
 
-/** EscrowManager — events + functions the backend needs */
 export const ESCROW_ABI = [
-  // Events (matching compiled EscrowManager.sol)
-  'event EscrowCreated(bytes32 indexed orderId, address indexed merchant, address indexed customer, uint256 amount, address token)',
-  'event EscrowLocked(bytes32 indexed orderId, uint256 lockedAt, uint256 autoReleaseAt)',
-  'event EscrowReleased(bytes32 indexed orderId, uint256 sellerAmount, uint256 platformFee)',
-  'event EscrowAutoReleased(bytes32 indexed orderId)',
-  'event EscrowDisputed(bytes32 indexed orderId, address initiator)',
-  'event EscrowRefunded(bytes32 indexed orderId, uint256 customerAmount)',
-  'event EscrowPartialRefund(bytes32 indexed orderId, uint256 customerAmount, uint256 sellerAmount)',
-  'event DeliveryConfirmed(bytes32 indexed orderId, address confirmedBy)',
+  { type: 'event', name: 'EscrowCreated',     anonymous: false, inputs: [{ name: 'orderId',  type: 'bytes32',  indexed: true  }, { name: 'merchant', type: 'address', indexed: true  }, { name: 'customer', type: 'address', indexed: true  }, { name: 'amount', type: 'uint256', indexed: false }, { name: 'token', type: 'address', indexed: false }] },
+  { type: 'event', name: 'EscrowLocked',      anonymous: false, inputs: [{ name: 'orderId',  type: 'bytes32',  indexed: true  }, { name: 'lockedAt', type: 'uint256', indexed: false }, { name: 'autoReleaseAt', type: 'uint256', indexed: false }] },
+  { type: 'event', name: 'EscrowReleased',    anonymous: false, inputs: [{ name: 'orderId',  type: 'bytes32',  indexed: true  }, { name: 'sellerAmount', type: 'uint256', indexed: false }, { name: 'platformFee', type: 'uint256', indexed: false }] },
+  { type: 'event', name: 'EscrowAutoReleased',anonymous: false, inputs: [{ name: 'orderId',  type: 'bytes32',  indexed: true  }] },
+  { type: 'event', name: 'EscrowDisputed',    anonymous: false, inputs: [{ name: 'orderId',  type: 'bytes32',  indexed: true  }, { name: 'initiator', type: 'address', indexed: false }] },
+  { type: 'event', name: 'EscrowRefunded',    anonymous: false, inputs: [{ name: 'orderId',  type: 'bytes32',  indexed: true  }, { name: 'customerAmount', type: 'uint256', indexed: false }] },
+  { type: 'event', name: 'EscrowPartialRefund',anonymous: false,inputs: [{ name: 'orderId',  type: 'bytes32',  indexed: true  }, { name: 'customerAmount', type: 'uint256', indexed: false }, { name: 'sellerAmount', type: 'uint256', indexed: false }] },
+  { type: 'event', name: 'DeliveryConfirmed', anonymous: false, inputs: [{ name: 'orderId',  type: 'bytes32',  indexed: true  }, { name: 'confirmedBy', type: 'address', indexed: false }] },
+  {
+    type: 'function', name: 'lockEscrow', stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'payload', type: 'tuple', components: [
+        { name: 'merchant',  type: 'address' },
+        { name: 'customer',  type: 'address' },
+        { name: 'amount',    type: 'uint256' },
+        { name: 'orderId',   type: 'bytes32' },
+        { name: 'nonce',     type: 'bytes32' },
+        { name: 'deadline',  type: 'uint256' },
+        { name: 'token',     type: 'address' },
+      ]},
+      { name: 'merchantSignature', type: 'bytes' },
+    ],
+    outputs: [],
+  },
+  { type: 'function', name: 'confirmDelivery',     stateMutability: 'nonpayable', inputs: [{ name: 'orderId', type: 'bytes32' }], outputs: [] },
+  { type: 'function', name: 'triggerAutoRelease',  stateMutability: 'nonpayable', inputs: [{ name: 'orderId', type: 'bytes32' }], outputs: [] },
+  { type: 'function', name: 'openDispute',         stateMutability: 'nonpayable', inputs: [{ name: 'orderId', type: 'bytes32' }], outputs: [] },
+  { type: 'function', name: 'executeDisputeRuling',stateMutability: 'nonpayable', inputs: [{ name: 'orderId', type: 'bytes32' }, { name: 'sellerBasisPoints', type: 'uint256' }], outputs: [] },
+  { type: 'function', name: 'addAcceptedToken',    stateMutability: 'nonpayable', inputs: [{ name: 'token', type: 'address' }], outputs: [] },
+  { type: 'function', name: 'setOracleAggregator', stateMutability: 'nonpayable', inputs: [{ name: 'oracle', type: 'address' }], outputs: [] },
+] as const;
 
-  // Functions
-  'function lockEscrow(tuple(address merchant, address customer, uint256 amount, bytes32 orderId, bytes32 nonce, uint256 deadline, address token) payload, bytes merchantSignature) external',
-  'function confirmDelivery(bytes32 orderId) external',
-  'function triggerAutoRelease(bytes32 orderId) external',
-  'function openDispute(bytes32 orderId) external',
-  'function executeDisputeRuling(bytes32 orderId, uint256 sellerBasisPoints) external',
-];
-
-/** DisputeResolution — matching compiled DisputeResolution.sol */
 export const DISPUTE_ABI = [
-  // Events
-  'event DisputeOpened(bytes32 indexed orderId, address initiator)',
-  'event EvidenceSubmitted(bytes32 indexed orderId, address submitter, string ipfsHash)',
-  'event ArbiterVoted(bytes32 indexed orderId, address arbiter, uint8 vote)',
-  'event DisputeResolved(bytes32 indexed orderId, uint256 sellerBasisPoints, bool isFinal)',
-  'event DisputeAppealed(bytes32 indexed orderId)',
-  'event DisputeFinalized(bytes32 indexed orderId, uint256 sellerBasisPoints)',
+  { type: 'event', name: 'DisputeOpened',    anonymous: false, inputs: [{ name: 'orderId', type: 'bytes32', indexed: true }, { name: 'initiator', type: 'address', indexed: false }] },
+  { type: 'event', name: 'EvidenceSubmitted',anonymous: false, inputs: [{ name: 'orderId', type: 'bytes32', indexed: true }, { name: 'submitter', type: 'address', indexed: false }, { name: 'ipfsHash', type: 'string', indexed: false }] },
+  { type: 'event', name: 'ArbiterVoted',     anonymous: false, inputs: [{ name: 'orderId', type: 'bytes32', indexed: true }, { name: 'arbiter', type: 'address', indexed: false }, { name: 'vote', type: 'uint8', indexed: false }] },
+  { type: 'event', name: 'DisputeResolved',  anonymous: false, inputs: [{ name: 'orderId', type: 'bytes32', indexed: true }, { name: 'sellerBasisPoints', type: 'uint256', indexed: false }, { name: 'isFinal', type: 'bool', indexed: false }] },
+  { type: 'event', name: 'DisputeAppealed',  anonymous: false, inputs: [{ name: 'orderId', type: 'bytes32', indexed: true }] },
+  { type: 'event', name: 'DisputeFinalized', anonymous: false, inputs: [{ name: 'orderId', type: 'bytes32', indexed: true }, { name: 'sellerBasisPoints', type: 'uint256', indexed: false }] },
+  { type: 'function', name: 'createDispute',  stateMutability: 'nonpayable', inputs: [{ name: 'orderId', type: 'bytes32' }, { name: 'initiator', type: 'address' }], outputs: [] },
+  { type: 'function', name: 'submitEvidence', stateMutability: 'nonpayable', inputs: [{ name: 'orderId', type: 'bytes32' }, { name: 'ipfsHash', type: 'string' }], outputs: [] },
+  { type: 'function', name: 'startVoting',    stateMutability: 'nonpayable', inputs: [{ name: 'orderId', type: 'bytes32' }], outputs: [] },
+  { type: 'function', name: 'castVote',       stateMutability: 'nonpayable', inputs: [{ name: 'orderId', type: 'bytes32' }, { name: 'vote', type: 'uint8' }, { name: 'sellerBasisPoints', type: 'uint256' }], outputs: [] },
+  { type: 'function', name: 'appeal',         stateMutability: 'nonpayable', inputs: [{ name: 'orderId', type: 'bytes32' }], outputs: [] },
+  { type: 'function', name: 'finalize',       stateMutability: 'nonpayable', inputs: [{ name: 'orderId', type: 'bytes32' }], outputs: [] },
+] as const;
 
-  // Functions
-  'function createDispute(bytes32 orderId, address initiator) external',
-  'function submitEvidence(bytes32 orderId, string calldata ipfsHash) external',
-  'function startVoting(bytes32 orderId) external',
-  'function castVote(bytes32 orderId, uint8 vote, uint256 sellerBasisPoints) external',
-  'function appeal(bytes32 orderId) external',
-  'function finalize(bytes32 orderId) external',
-];
-
-/** LogisticsOracle — matching compiled LogisticsOracle.sol */
 export const ORACLE_ABI = [
-  // Events
-  'event ProviderConfirmed(bytes32 indexed orderId, address provider, string trackingCode)',
-  'event ConsensusReached(bytes32 indexed orderId, uint256 confirmedAt)',
+  { type: 'event', name: 'ProviderConfirmed', anonymous: false, inputs: [{ name: 'orderId', type: 'bytes32', indexed: true }, { name: 'provider', type: 'address', indexed: false }, { name: 'trackingCode', type: 'string', indexed: false }] },
+  { type: 'event', name: 'ConsensusReached',  anonymous: false, inputs: [{ name: 'orderId', type: 'bytes32', indexed: true }, { name: 'confirmedAt', type: 'uint256', indexed: false }] },
+  { type: 'function', name: 'confirmDelivery', stateMutability: 'nonpayable', inputs: [{ name: 'orderId', type: 'bytes32' }, { name: 'trackingCode', type: 'string' }], outputs: [] },
+] as const;
 
-  // Functions
-  'function confirmDelivery(bytes32 orderId, string calldata trackingCode) external',
-];
-
-/** SettlementContract — matching compiled SettlementContract.sol */
 export const SETTLEMENT_ABI = [
-  // Events
-  'event BatchCommitted(uint256 indexed batchId, bytes32 merkleRoot, uint256 txCount)',
+  { type: 'event', name: 'BatchCommitted', anonymous: false, inputs: [{ name: 'batchId', type: 'uint256', indexed: true }, { name: 'merkleRoot', type: 'bytes32', indexed: false }, { name: 'txCount', type: 'uint256', indexed: false }] },
+  { type: 'function', name: 'commitBatch',       stateMutability: 'nonpayable', inputs: [{ name: 'merkleRoot', type: 'bytes32' }, { name: 'txCount', type: 'uint256' }, { name: 'ipfsHash', type: 'string' }], outputs: [{ name: 'batchId', type: 'uint256' }] },
+  { type: 'function', name: 'verifyTransaction', stateMutability: 'view',       inputs: [{ name: 'batchId', type: 'uint256' }, { name: 'txHash', type: 'bytes32' }, { name: 'proof', type: 'bytes32[]' }], outputs: [{ name: '', type: 'bool' }] },
+  { type: 'function', name: 'getBatchCount',     stateMutability: 'view',       inputs: [], outputs: [{ name: '', type: 'uint256' }] },
+] as const;
 
-  // Functions
-  'function commitBatch(bytes32 merkleRoot, uint256 txCount, string calldata ipfsHash) external returns (uint256 batchId)',
-  'function verifyTransaction(uint256 batchId, bytes32 txHash, bytes32[] calldata proof) external view returns (bool)',
-  'function getBatchCount() external view returns (uint256)',
-];
-
-/** Minimal ERC-20 ABI */
 export const ERC20_ABI = [
-  'function approve(address spender, uint256 amount) external returns (bool)',
-  'function transfer(address to, uint256 amount) external returns (bool)',
-  'function transferFrom(address from, address to, uint256 amount) external returns (bool)',
-  'function balanceOf(address account) external view returns (uint256)',
-];
+  { type: 'function', name: 'approve',      stateMutability: 'nonpayable', inputs: [{ name: 'spender', type: 'address' }, { name: 'amount', type: 'uint256' }], outputs: [{ name: '', type: 'bool' }] },
+  { type: 'function', name: 'transfer',     stateMutability: 'nonpayable', inputs: [{ name: 'to', type: 'address' }, { name: 'amount', type: 'uint256' }], outputs: [{ name: '', type: 'bool' }] },
+  { type: 'function', name: 'transferFrom', stateMutability: 'nonpayable', inputs: [{ name: 'from', type: 'address' }, { name: 'to', type: 'address' }, { name: 'amount', type: 'uint256' }], outputs: [{ name: '', type: 'bool' }] },
+  { type: 'function', name: 'balanceOf',    stateMutability: 'view',       inputs: [{ name: 'account', type: 'address' }], outputs: [{ name: '', type: 'uint256' }] },
+  { type: 'function', name: 'allowance',    stateMutability: 'view',       inputs: [{ name: 'owner', type: 'address' }, { name: 'spender', type: 'address' }], outputs: [{ name: '', type: 'uint256' }] },
+  { type: 'function', name: 'decimals',     stateMutability: 'view',       inputs: [], outputs: [{ name: '', type: 'uint8' }] },
+] as const;
