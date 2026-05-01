@@ -1,0 +1,87 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: payment_hub
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: packages/backend/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/payment_hub
+      REDIS_URL: redis://redis:6379
+      SEPOLIA_RPC_URL: ${SEPOLIA_RPC_URL}
+      SEPOLIA_WS_URL: ${SEPOLIA_WS_URL}
+      DEPLOYER_PRIVATE_KEY: ${DEPLOYER_PRIVATE_KEY}
+      ESCROW_CONTRACT_ADDRESS: ${ESCROW_CONTRACT_ADDRESS}
+      DISPUTE_CONTRACT_ADDRESS: ${DISPUTE_CONTRACT_ADDRESS}
+      ORACLE_CONTRACT_ADDRESS: ${ORACLE_CONTRACT_ADDRESS}
+      SETTLEMENT_CONTRACT_ADDRESS: ${SETTLEMENT_CONTRACT_ADDRESS}
+      USDT_ADDRESS: ${USDT_ADDRESS}
+      TREASURY_ADDRESS: ${TREASURY_ADDRESS}
+      PINATA_JWT: ${PINATA_JWT}
+      PORT: 3001
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: .
+      dockerfile: packages/frontend/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_BACKEND_URL: http://backend:3001
+      NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID: ${NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID}
+      PORT: 3000
+    depends_on:
+      - backend
+
+  oracle:
+    build:
+      context: .
+      dockerfile: packages/oracle/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3002:3002"
+    environment:
+      NODE_ENV: production
+      SEPOLIA_RPC_URL: ${SEPOLIA_RPC_URL}
+      LOGISTICS_ORACLE_ADDRESS: ${ORACLE_CONTRACT_ADDRESS}
+      BACKEND_API_URL: http://backend:3001
+      PORT: 3002
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
