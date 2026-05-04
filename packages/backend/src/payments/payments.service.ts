@@ -34,7 +34,7 @@ export class PaymentsService {
     const payment = await this.paymentRepo.findOne({ where: { orderId } });
     if (!payment) throw new NotFoundException(`Payment for order ${orderId} not found`);
 
-    const order = await this.orderRepo.findOne({ where: { id: orderId } });
+    const order = await this.orderRepo.findOne({ where: { id: orderId } }).catch(() => null);
 
     // Auto-sign if merchant signature not yet stored
     if (!payment.merchantSignature) {

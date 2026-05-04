@@ -59,11 +59,11 @@ export class PaymentRequestService {
     });
     await this.paymentRepo.save(payment);
 
-    // Backfill onChainOrderId on the Order if it exists
+    // Backfill onChainOrderId on the Order if it exists (best-effort — id may not be a valid UUID)
     await this.orderRepo.update(
       { id: dto.platformOrderId },
       { onChainOrderId: orderIdBytes },
-    );
+    ).catch(() => { /* no matching order — fine */ });
 
     const payload: PaymentPayload = {
       merchant: dto.merchantAddress,

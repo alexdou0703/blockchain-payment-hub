@@ -101,11 +101,22 @@ export class EventListenerService implements OnModuleInit {
     this.logger.log('Blockchain event listeners registered');
   }
 
-  /** Find payment by onChainOrderId on the linked Order, update payment state */
-  private async updatePaymentByOrderId(orderId: string, state: PaymentState) {
-    const order = await this.orderRepo.findOne({ where: { onChainOrderId: orderId } });
-    if (!order) return;
-    await this.paymentRepo.update({ orderId: order.id }, { state });
+  /** Find payment by onChainOrderId, update payment state */
+  private async updatePaymentByOrderId(onChainOrderId: string, state: PaymentState) {
+    // Primary path: via linked Order row
+    const order = await this.orderRepo.findOne({ where: { onChainOrderId } }).catch(() => null);
+    if (order) {
+      await this.paymentRepo.update({ orderId: order.id }, { state });
+      return;
+    }
+    // Fallback: scan PENDING payments and find whose orderId hashes to the on-chain id
+    const pending = await this.paymentRepo.find({ where: { state: PaymentState.PENDING } });
+    for (const p of pending) {
+      if (ethers.keccak256(ethers.toUtf8Bytes(p.orderId)) === onChainOrderId) {
+        await this.paymentRepo.update({ id: p.id }, { state });
+        this.logger.log(`Synced payment ${p.id} via hash fallback`);
+      }
+    }
   }
 
   /** Update order status when delivery is confirmed on-chain */
