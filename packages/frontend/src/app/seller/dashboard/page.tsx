@@ -23,8 +23,8 @@ export default function SellerDashboard() {
   });
 
   const { data: releasedOrders = [] } = useQuery({
-    queryKey: ['orders', 'RELEASED'],
-    queryFn: () => api.getOrders({ merchantId, status: 'RELEASED' }),
+    queryKey: ['orders', 'COMPLETED'],
+    queryFn: () => api.getOrders({ merchantId, status: 'COMPLETED' }),
   });
 
   const sum = (orders: typeof lockedOrders) =>

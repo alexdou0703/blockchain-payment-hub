@@ -40,7 +40,11 @@ export class OrdersService {
   /** List orders filtered by merchantId and optional status */
   async findByMerchant(merchantId: string, status?: OrderStatus): Promise<Order[]> {
     const where: Record<string, unknown> = { merchantId };
-    if (status) where['status'] = status;
+    if (status) {
+      // Guard against invalid enum values (e.g. PaymentState values sent by mistake)
+      if (!Object.values(OrderStatus).includes(status)) return [];
+      where['status'] = status;
+    }
     return this.orderRepo.find({ where, order: { createdAt: 'DESC' } });
   }
 
