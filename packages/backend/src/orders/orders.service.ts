@@ -37,6 +37,13 @@ export class OrdersService {
     return this.orderRepo.save(order);
   }
 
+  /** List orders filtered by merchantId and optional status */
+  async findByMerchant(merchantId: string, status?: OrderStatus): Promise<Order[]> {
+    const where: Record<string, unknown> = { merchantId };
+    if (status) where['status'] = status;
+    return this.orderRepo.find({ where, order: { createdAt: 'DESC' } });
+  }
+
   /** Called by EventListenerService when DeliveryConfirmed fires on-chain */
   async markDelivered(onChainOrderId: string): Promise<void> {
     await this.orderRepo.update(

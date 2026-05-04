@@ -5,8 +5,10 @@ import {
   Patch,
   Param,
   Body,
+  Query,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiParam } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiParam, ApiQuery } from '@nestjs/swagger';
+import { OrderStatus } from '@payment-hub/shared';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
@@ -15,6 +17,17 @@ import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 @Controller('api/v1/orders')
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
+
+  @Get()
+  @ApiOperation({ summary: 'List orders by merchantId and optional status' })
+  @ApiQuery({ name: 'merchantId', required: true })
+  @ApiQuery({ name: 'status', required: false, enum: OrderStatus })
+  listOrders(
+    @Query('merchantId') merchantId: string,
+    @Query('status') status?: OrderStatus,
+  ) {
+    return this.ordersService.findByMerchant(merchantId, status);
+  }
 
   @Post()
   @ApiOperation({ summary: 'Create a new order' })
