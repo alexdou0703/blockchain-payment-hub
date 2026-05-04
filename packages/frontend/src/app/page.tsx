@@ -20,6 +20,12 @@ export default function HomePage() {
         >
           Seller Dashboard
         </Link>
+        <Link
+          href="/metrics"
+          className="block text-center bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-semibold py-3 px-6 rounded-lg transition"
+        >
+          Metrics Dashboard
+        </Link>
       </div>
     </main>
   );

@@ -9,7 +9,8 @@
     "deploy:localhost": "hardhat run scripts/deploy.ts --network localhost",
     "deploy:sepolia": "hardhat run scripts/deploy.ts --network sepolia",
     "verify": "hardhat verify --network sepolia",
-    "node": "hardhat node"
+    "node": "hardhat node",
+    "measure-gas": "npx hardhat run scripts/measure-gas.ts --network hardhat"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
