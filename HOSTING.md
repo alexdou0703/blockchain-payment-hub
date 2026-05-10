@@ -1,132 +1,159 @@
-# Permanent Hosting on Railway
+# Production Hosting — Live URLs
 
-The Cloudflare quick tunnels in `DEPLOYMENT.md` are great for "I want my team to test it in 5 minutes," but they die when this Mac sleeps. For 24/7 uptime, deploy to **Railway** — it picks up the Dockerfiles already in this repo, gives every service a permanent `*.up.railway.app` URL, and provides managed Postgres + Redis. Estimated setup time: ~15 minutes. Cost: covered by Railway's $5/mo free credit for a project this size.
+## What your team uses
 
-## One-time setup
+| What | URL |
+| - | - |
+| **Frontend (the website)** | https://payment-hub-frontend.vercel.app |
+| Backend API | https://backend-production-5488.up.railway.app |
+| Backend Swagger docs | https://backend-production-5488.up.railway.app/api/docs |
 
-### 1. Authenticate the Railway CLI (only thing that needs your browser)
+Smart contracts live on **Sepolia testnet** (immutable, shared across all environments):
 
-In your terminal (or paste in the Claude Code prompt with the `!` prefix):
+| Contract | Address |
+| - | - |
+| EscrowManager | `0xC40AB9fDD3B70a3327647ff7aD851921D85D0C4B` |
+| LogisticsOracle | `0xA1A34F39f2c2644941e40ef149813D22da7077e5` |
+| DisputeResolution | `0xC9dE93D7c83D73b82Aa147BeE3653a86CD1cdCEe` |
+| SettlementContract | `0xe6c346D2680D2c0cCfF4a00755fd947fA77E60c9` |
+| MockUSDT | `0xfAB3f938A1E198119e32b7a2Fd1F16BFAE9e07a0` |
+
+---
+
+## Architecture
 
 ```
-railway login
+┌────────────────────────────────────────────────┐
+│  Browser (anywhere on the internet)            │
+│  + MetaMask on Sepolia testnet                 │
+└──────────────┬─────────────────────────────────┘
+               │ HTTPS
+               ▼
+┌────────────────────────────────────────────────┐
+│  Vercel — Frontend (Next.js 14)                │
+│  payment-hub-frontend.vercel.app               │
+│  Auto-redeploys from main branch               │
+└──────────────┬─────────────────────────────────┘
+               │ HTTPS (CORS-allowed cross-origin)
+               ▼
+┌────────────────────────────────────────────────┐
+│  Railway — Backend (NestJS)                    │
+│  backend-production-5488.up.railway.app        │
+│  Auto-redeploys from main branch               │
+└────────┬───────────────────────────┬───────────┘
+         │ private network           │ HTTPS
+         ▼                           ▼
+┌─────────────────┐          ┌──────────────────┐
+│ Railway Postgres│          │ Sepolia (Infura) │
+│ Railway Redis   │          │ ethers.js        │
+└─────────────────┘          └──────────────────┘
 ```
 
-A browser opens; approve, return to terminal. From here on, the CLI is authenticated locally.
+**Why split?** Railway's free plan caps at 3 services per project; we used those for Postgres, Redis, and the backend. Vercel hosts the Next.js frontend for free with no service cap, and is purpose-built for Next.js (faster builds, edge cache, automatic preview URLs per PR).
 
-### 2. Create the Railway project + add managed plugins
+---
+
+## Auto-deploy
+
+Both Vercel and Railway are wired to the GitHub repo (`alexdou0703/blockchain-payment-hub`, branch `main`):
+
+- Pushing to `main` triggers a Vercel build of the frontend.
+- Pushing to `main` triggers a Railway build of the backend.
+
+No manual redeploy needed for code changes.
+
+---
+
+## What testers need
+
+1. **MetaMask** (or any WalletConnect wallet).
+2. Wallet on **Sepolia testnet** (chain id `11155111`). The checkout page auto-prompts a switch if you're on the wrong chain.
+3. **Sepolia ETH** for gas — free at https://www.alchemy.com/faucets/ethereum-sepolia
+4. **MockUSDT** — ask the project deployer to mint some to your wallet (no public faucet — it's a test token).
+
+The checkout page does pre-flight balance checks and shows clear errors with faucet links if either is short.
+
+---
+
+## On-chain error handling (frontend)
+
+The checkout flow classifies and surfaces the common failure modes:
+
+| Code | Meaning | What user sees |
+| - | - | - |
+| `user_rejected` | User cancelled the wallet popup | "You cancelled the transaction…" |
+| `wrong_network` | Wallet not on Sepolia | Auto-prompt network switch |
+| `insufficient_eth` | No Sepolia ETH for gas | Faucet link |
+| `insufficient_usdt` | MockUSDT balance < amount | Mint hint |
+| `insufficient_allowance` | approve() failed | "Approve again and retry" |
+| `deadline_expired` | Payment older than 24h | Auto-refetch (backend re-signs) |
+| `nonce_used` | Already locked on-chain | Clear message |
+| `invalid_signature` | Merchant sig mismatch | Auto-refetch |
+| `token_not_whitelisted` | Token not allowed | Surfaced |
+| `rpc_error` | Sepolia RPC flaky | "Network error… try again" |
+| `simulation_revert` | Other contract revert | The contract reason itself |
+
+Pre-flight before sending the lock tx: chain check + auto-switch to Sepolia, ETH balance ≥ 0.001, USDT balance ≥ amount, approve receipt waited before lockEscrow, simulateContract first.
+
+---
+
+## Local re-deploy commands
+
+You shouldn't normally need these — git push handles auto-deploy. But for debugging:
+
+### Backend (Railway)
+
+```bash
+# Manual redeploy of latest main commit
+RAILWAY_TOKEN=<your-project-token> \
+  curl -sS https://backboard.railway.com/graphql/v2 \
+  -H "Project-Access-Token: $RAILWAY_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"query":"mutation{ serviceInstanceDeployV2(serviceId:\"<backend-id>\", environmentId:\"<env-id>\") }"}'
+
+# View logs
+railway logs --service backend
+```
+
+Project ID: `76d81044-83db-483b-a759-9cb132b36906`
+Environment ID (production): `0ba9983a-9c02-49ff-a601-9d17291ce872`
+Backend service ID: `78557a88-7f97-4788-a7de-f8ae484c67b9`
+
+### Frontend (Vercel)
 
 ```bash
 cd /Users/ducky08/Desktop/ecomBLC/payment-hub
-railway init                       # name it "payment-hub"
-railway add --database postgres    # spins up a managed Postgres
-railway add --database redis       # spins up a managed Redis
+VERCEL_TOKEN=<your-token> vercel deploy --prod --yes
 ```
 
-Both managed plugins automatically expose `DATABASE_URL` and `REDIS_URL` env variables, available to every service in the project.
-
-### 3. Create the three application services
-
-Railway needs each Dockerfile-based service registered separately because we have three apps in one repo. The CLI command for monorepo services:
-
-```bash
-# Backend (NestJS)
-railway service create backend
-railway link --service backend
-railway variables set --kv \
-  NODE_ENV=production \
-  PORT=3001 \
-  SEPOLIA_RPC_URL='https://sepolia.infura.io/v3/190f6462cfbd4f6dbc78382957536876' \
-  SEPOLIA_WS_URL='wss://sepolia.infura.io/ws/v3/190f6462cfbd4f6dbc78382957536876' \
-  ESCROW_CONTRACT_ADDRESS=0xC40AB9fDD3B70a3327647ff7aD851921D85D0C4B \
-  DISPUTE_CONTRACT_ADDRESS=0xC9dE93D7c83D73b82Aa147BeE3653a86CD1cdCEe \
-  ORACLE_CONTRACT_ADDRESS=0xA1A34F39f2c2644941e40ef149813D22da7077e5 \
-  SETTLEMENT_CONTRACT_ADDRESS=0xe6c346D2680D2c0cCfF4a00755fd947fA77E60c9 \
-  USDT_ADDRESS=0xfAB3f938A1E198119e32b7a2Fd1F16BFAE9e07a0 \
-  TREASURY_ADDRESS=0x160F267cEF249Ced05c30e32172E9420E8Ad1EC8 \
-  ETHERSCAN_API_KEY='X49A2V9UZ6EJ3XVUXAV157225AFEJ4WRMQ' \
-  DEPLOYER_PRIVATE_KEY='<copy from .env — do NOT commit>' \
-  PINATA_JWT='<copy from .env if set>' \
-  CORS_ALLOWED_ORIGINS='https://<frontend>.up.railway.app'  # fill after step 5
-railway up --detach
-
-# Oracle
-railway service create oracle
-railway link --service oracle
-railway variables set --kv \
-  NODE_ENV=production \
-  PORT=3002 \
-  SEPOLIA_RPC_URL='https://sepolia.infura.io/v3/190f6462cfbd4f6dbc78382957536876' \
-  LOGISTICS_ORACLE_ADDRESS=0xA1A34F39f2c2644941e40ef149813D22da7077e5 \
-  BACKEND_API_URL='https://<backend>.up.railway.app'  # fill after step 4
-railway up --detach
-```
-
-### 4. Grab the backend URL, then create the frontend
-
-After step 3 the backend has a public URL (Railway dashboard → backend → Settings → Domains; or `railway domain`). Copy that URL.
-
-```bash
-railway service create frontend
-railway link --service frontend
-railway variables set --kv \
-  NODE_ENV=production \
-  PORT=3000 \
-  NEXT_PUBLIC_API_URL='https://<backend>.up.railway.app' \
-  NEXT_PUBLIC_WS_URL='https://<backend>.up.railway.app' \
-  NEXT_PUBLIC_ESCROW_ADDRESS=0xC40AB9fDD3B70a3327647ff7aD851921D85D0C4B \
-  NEXT_PUBLIC_USDT_ADDRESS=0xfAB3f938A1E198119e32b7a2Fd1F16BFAE9e07a0 \
-  NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=105e6b3219f2a5739f739ba9010ddbd3
-railway up --detach
-```
-
-> **Why `NEXT_PUBLIC_*` must be set BEFORE `railway up`:** Next.js inlines these into the static JS bundle at build time. Setting them after deploy doesn't change the running site — you'd have to redeploy.
-
-### 5. Wire CORS back to the frontend domain
-
-After step 4 the frontend has a public URL too. Go back to the backend service variables:
-
-```bash
-railway link --service backend
-railway variables set --kv CORS_ALLOWED_ORIGINS='https://<frontend>.up.railway.app'
-railway redeploy
-```
-
-Backend CORS is already permissive for `*.up.railway.app` via the regex in `packages/backend/src/main.ts`, so this step is belt-and-suspenders — the env var is only needed if you later put a custom domain in front.
-
-### 6. Hand the team the frontend URL
-
-That's the production-ready URL. It survives Mac sleeps, restarts, IP changes, everything.
+Vercel project: `dylannn08200-4065s-projects/payment-hub-frontend`
 
 ---
 
-## What about MockUSDT for testers?
+## Updating env vars
 
-There's no public faucet for the MockUSDT token (it's a private test token deployed by you). When a tester wants to try the system, they need MockUSDT minted to their wallet. Run from your machine (using `.env` with the deployer private key):
+### On Railway backend (any of the SEPOLIA_*, contract addresses, etc.):
+
+Use the Railway dashboard at https://railway.com/project/76d81044-83db-483b-a759-9cb132b36906 → backend service → Variables, OR via API:
 
 ```bash
-# From repo root
-npx hardhat console --network sepolia
-> const usdt = await ethers.getContractAt('MockUSDT', '0xfAB3f938A1E198119e32b7a2Fd1F16BFAE9e07a0')
-> await usdt.mint('<tester-wallet-address>', ethers.parseUnits('1000', 6))  // 1000 MockUSDT
+curl -sS https://backboard.railway.com/graphql/v2 \
+  -H "Project-Access-Token: $RAILWAY_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"query":"mutation{ variableUpsert(input:{projectId:\"76d81044-83db-483b-a759-9cb132b36906\", environmentId:\"0ba9983a-9c02-49ff-a601-9d17291ce872\", serviceId:\"78557a88-7f97-4788-a7de-f8ae484c67b9\", name:\"MY_VAR\", value:\"my_value\"}) }"}'
 ```
 
-(Or add a small REST endpoint to the backend behind admin auth — but for a dissertation cohort, manual minting is fine.)
+### On Vercel frontend (the `NEXT_PUBLIC_*` vars):
+
+Vercel dashboard at https://vercel.com/dylannn08200-4065s-projects/payment-hub-frontend/settings/environment-variables, OR via CLI:
+
+```bash
+echo "https://new-backend-url" | VERCEL_TOKEN=... vercel env add NEXT_PUBLIC_API_URL production
+VERCEL_TOKEN=... vercel deploy --prod --yes  # rebuild needed — NEXT_PUBLIC_* are baked at build time
+```
 
 ---
 
-## Continuous deploys
+## Cloudflare quick tunnels (legacy "test in 5 minutes" mode)
 
-Once the project is set up, every `git push origin main` redeploys all three services automatically (Railway watches GitHub). Branch deploys are also supported per service in the dashboard.
-
----
-
-## Falling back if Railway free credit runs out
-
-Same Dockerfiles work on:
-
-- **Fly.io** — `flyctl launch` from each `packages/*/` directory; Postgres via `flyctl postgres create`; Redis via Upstash addon. ~$0/mo on free tier.
-- **Render** — drop a `render.yaml` at repo root; free tier sleeps after 15 min idle which **breaks the blockchain event listener**, so use a paid web service ($7/mo) for the backend.
-- **Any VPS** — `docker compose up -d` from the existing `docker-compose.yml`.
-
-The codebase is hosting-agnostic — the only thing pinning it to one provider is the env-var wiring above.
+`DEPLOYMENT.md` documents the cloudflared-tunnel setup that runs the whole stack on your Mac. It's ephemeral but sometimes useful for very rapid iteration. The Railway+Vercel setup above replaces it for permanent team testing.
