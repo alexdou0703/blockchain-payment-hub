@@ -37,6 +37,8 @@ async function bootstrap() {
         /\.trycloudflare\.com$/.test(host) ||
         /\.ngrok-free\.app$/.test(host) ||
         /\.ngrok\.io$/.test(host) ||
+        /\.vercel\.app$/.test(host) ||
+        /\.up\.railway\.app$/.test(host) ||
         extraOrigins.includes(origin);
       cb(allowed ? null : new Error(`CORS: origin ${origin} not allowed`), allowed);
     },
