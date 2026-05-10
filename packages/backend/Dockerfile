@@ -22,6 +22,7 @@ WORKDIR /app
 COPY packages/shared ./packages/shared
 COPY packages/backend/src ./packages/backend/src
 COPY packages/backend/tsconfig.json ./packages/backend/
+COPY packages/backend/tsconfig.build.json ./packages/backend/
 COPY packages/backend/nest-cli.json ./packages/backend/
 
 WORKDIR /app/packages/backend
