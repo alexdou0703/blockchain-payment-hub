@@ -60,6 +60,17 @@ export const api = {
   getPayment: (id: string) =>
     request<{ id: string; state: string; chainTxHash: string | null }>(`/api/v1/payments/${id}`),
 
+  createPaymentRequest: (body: {
+    platformOrderId: string;
+    merchantAddress: string;
+    customerAddress: string;
+    amount: string;
+  }) =>
+    request<PaymentRequestData>(`/api/v1/payments/request`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
   getOrders: (params: Record<string, string>) => {
     const qs = new URLSearchParams(params).toString();
     return request<OrderData[]>(`/api/v1/orders?${qs}`);
