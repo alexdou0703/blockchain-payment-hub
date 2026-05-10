@@ -36,6 +36,19 @@ export class PaymentsService {
 
     const order = await this.orderRepo.findOne({ where: { id: orderId } }).catch(() => null);
 
+    // Refresh expired deadline — re-sign with a fresh 24-hour window so the
+    // customer can still pay even if they return after the original window.
+    const now = Math.floor(Date.now() / 1000);
+    if (Number(payment.deadline) <= now) {
+      const freshDeadline = now + 86400;
+      await this.paymentRepo.update(
+        { id: payment.id },
+        { deadline: freshDeadline, merchantSignature: null as unknown as string },
+      );
+      payment.deadline = freshDeadline;
+      payment.merchantSignature = null as unknown as string;
+    }
+
     // Auto-sign if merchant signature not yet stored
     if (!payment.merchantSignature) {
       const sig = await this._signPayload(payment);
@@ -49,6 +62,7 @@ export class PaymentsService {
 
     return {
       paymentId: payment.id,
+      state:     payment.state,
       payload: {
         merchant:  payment.merchantAddress,
         customer:  payment.customerAddress,

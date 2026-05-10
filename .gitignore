@@ -15,7 +15,13 @@
 
 # Environment secrets — keep .env.example, ignore real .env
 **/.env
+**/.env.local
+**/.env.*.local
 !**/.env.example
+
+# Next.js
+**/.next/
+**/next-env.d.ts
 
 # Logs
 *.log

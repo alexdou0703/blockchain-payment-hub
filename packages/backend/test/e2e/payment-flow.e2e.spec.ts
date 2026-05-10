@@ -54,8 +54,14 @@ const mockSettlementContract = {
   verifyTransaction: jest.fn().mockResolvedValue(true),
 };
 
+const mockSigner = {
+  provider: { getNetwork: jest.fn().mockResolvedValue({ chainId: 11155111n }) },
+  signTypedData: jest.fn().mockResolvedValue('0xSIG_FROM_E2E_STUB'),
+};
+
 const mockEthersService = {
   getSettlementContract: jest.fn().mockReturnValue(mockSettlementContract),
+  getSigner: jest.fn().mockReturnValue(mockSigner),
   sendTransaction: jest.fn().mockResolvedValue({
     hash: '0xBatchTxE2E',
     logs: [{ topics: ['0xEvent', '0x5'] }],
@@ -217,14 +223,33 @@ describe('Payment Flow E2E', () => {
 
   // ── 5. Get payment by order ───────────────────────────────────────────────────
   it('GET /api/v1/payments/order/:orderId → 200 with PENDING state', async () => {
-    const savedPayment = { id: 'pay-uuid-1', orderId: 'order-1', state: PaymentState.PENDING };
+    const farFutureDeadline = Math.floor(Date.now() / 1000) + 86_400;
+    const savedPayment = {
+      id: 'pay-uuid-1',
+      orderId: 'order-1',
+      merchantAddress: '0x1111111111111111111111111111111111111111',
+      customerAddress: '0x2222222222222222222222222222222222222222',
+      tokenAddress:    '0x0000000000000000000000000000000000000001',
+      amount: '50.000000',
+      nonce: '0x' + 'aa'.repeat(32),
+      deadline: farFutureDeadline,
+      merchantSignature: '0xPRESIGNED',
+      state: PaymentState.PENDING,
+    };
     mockPaymentRepo.findOne.mockResolvedValue(savedPayment);
+    mockOrderRepo.findOne.mockResolvedValue({
+      id: 'order-1',
+      merchantId: 'merch-1',
+      status: OrderStatus.CREATED,
+    });
 
     const res = await request(app.getHttpServer())
       .get('/api/v1/payments/order/order-1')
       .expect(200);
 
     expect(res.body.state).toBe(PaymentState.PENDING);
+    expect(res.body.paymentId).toBe('pay-uuid-1');
+    expect(res.body.merchantSignature).toBe('0xPRESIGNED');
   });
 
   // ── 6. Trigger batch settlement — 1 payment ───────────────────────────────────

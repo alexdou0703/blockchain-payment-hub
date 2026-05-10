@@ -16,9 +16,30 @@ async function bootstrap() {
     }),
   );
 
-  // CORS — explicit config required for preflight (OPTIONS) requests
+  // CORS — accept localhost for dev, plus any *.trycloudflare.com / *.ngrok-free.app
+  // origin so the public-tunnel deployment for team testing works without
+  // leaking credentials to arbitrary sites. Extra origins can be added via
+  // CORS_ALLOWED_ORIGINS=https://foo.com,https://bar.com.
+  const extraOrigins = (process.env.CORS_ALLOWED_ORIGINS ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
   app.enableCors({
-    origin: ['http://localhost:3000', 'http://localhost:3001'],
+    origin: (origin, cb) => {
+      // Server-to-server / curl with no Origin header — allow.
+      if (!origin) return cb(null, true);
+      let host = '';
+      try { host = new URL(origin).hostname; } catch { /* malformed origin */ }
+      const allowed =
+        origin.startsWith('http://localhost:') ||
+        origin.startsWith('http://127.0.0.1:') ||
+        /\.trycloudflare\.com$/.test(host) ||
+        /\.ngrok-free\.app$/.test(host) ||
+        /\.ngrok\.io$/.test(host) ||
+        extraOrigins.includes(origin);
+      cb(allowed ? null : new Error(`CORS: origin ${origin} not allowed`), allowed);
+    },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,

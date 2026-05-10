@@ -34,8 +34,8 @@ export class PaymentRequestService {
     // Random nonce to prevent replay attacks
     const nonce = ethers.hexlify(ethers.randomBytes(32));
 
-    // Payment window: 30 minutes from now
-    const deadline = Math.floor(Date.now() / 1000) + 1800;
+    // Payment window: 24 hours from now
+    const deadline = Math.floor(Date.now() / 1000) + 86400;
 
     const tokenAddress =
       this.config.get<string>('blockchain.usdtAddress') || ethers.ZeroAddress;

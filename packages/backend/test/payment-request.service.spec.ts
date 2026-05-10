@@ -88,11 +88,11 @@ describe('PaymentRequestService', () => {
       expect(payload.nonce.length).toBe(66);
     });
 
-    it('should return a deadline approximately 30 minutes in the future', async () => {
+    it('should return a deadline approximately 24 hours in the future', async () => {
       const nowSecs = Math.floor(Date.now() / 1000);
       const { payload } = await service.generatePaymentRequest(dto);
 
-      const expectedDeadline = nowSecs + 1800;
+      const expectedDeadline = nowSecs + 86_400;
       // Allow 2-second tolerance for test execution time
       expect(payload.deadline).toBeGreaterThanOrEqual(expectedDeadline - 2);
       expect(payload.deadline).toBeLessThanOrEqual(expectedDeadline + 2);
